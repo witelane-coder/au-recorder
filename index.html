@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Аудио: формат под iPhone</title>
+    <title>Аудио: скачать и открыть в телефоне</title>
     <style>
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -14,8 +14,12 @@
         flex-direction: column;
         align-items: center;
       }
-      h1 { font-size: 1.5rem; margin-bottom: 20px; text-align: center; }
-      
+      h1 {
+        font-size: 1.5rem;
+        margin-bottom: 20px;
+        text-align: center;
+      }
+
       button {
         padding: 24px 32px;
         font-size: 1.4rem;
@@ -28,8 +32,10 @@
         max-width: 400px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.1);
       }
-      button:active { transform: scale(0.96); }
-      
+      button:active {
+        transform: scale(0.96);
+      }
+
       #initBtn { background-color: #888; display: block; }
       #startBtn { background-color: #007aff; display: none; }
       #stopBtn {
@@ -55,28 +61,33 @@
       .status.ok { color: #28a745; border-color: #28a745; background: #e8f5e9; }
       .status.error { color: #d9534f; border-color: #d9534f; background: #f8d7da; }
 
-      .player-box {
+      /* Кнопка скачивания/открытия — крупная и заметная */
+      .download-btn {
+        display: inline-block;
         margin-top: 24px;
-        width: 100%;
-        max-width: 420px;
+        padding: 22px 30px;
+        font-size: 1.35rem;
+        background: #28a745;
+        color: white;
+        text-decoration: none;
+        border-radius: 14px;
+        box-shadow: 0 6px 18px rgba(40, 167, 69, 0.3);
+        font-weight: 600;
+        transition: transform 0.1s;
       }
-      audio {
-        width: 100%;
-        border-radius: 12px;
-        height: 60px;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-      }
+      .download-btn:active { transform: scale(0.97); }
     </style>
   </head>
   <body>
-    <h1>Крупный тулбар + формат для iPhone</h1>
+    <h1>Крупный тулбар + открыть в телефоне</h1>
 
     <button id="initBtn">1. Нажми сюда для доступа к микрофону</button>
     <button id="startBtn">2. Начать запись</button>
     <button id="stopBtn" disabled>3. Стоп</button>
 
     <div class="status" id="status">Готов к тесту</div>
-    <div class="player-box" id="playerContainer" style="display:none;"></div>
+    <!-- Сюда появится кнопка скачивания -->
+    <div id="downloadContainer" style="display:none;"></div>
 
     <script>
       let recorder = null;
@@ -87,7 +98,7 @@
       const startBtn = document.getElementById('startBtn');
       const stopBtn = document.getElementById('stopBtn');
       const status = document.getElementById('status');
-      const playerContainer = document.getElementById('playerContainer');
+      const downloadContainer = document.getElementById('downloadContainer');
 
       initBtn.addEventListener('click', () => {
         initBtn.style.display = 'none';
@@ -119,32 +130,33 @@
 
             if (chunks.length === 0) {
               status.className = 'error';
-              status.textContent = '❌ Запись пуста.';
+              status.textContent = '❌ Запись пуста. Что-то пошло не так.';
               return;
             }
 
-            // ВАЖНО: тип оставляем webm (иначе запись не пойдёт), 
-            // но для плеера мы создадим ссылку и хитро назовём её mp3, чтобы iOS не ругался
+            // Формат остаётся webm — он единственный рабочий для записи
             const blob = new Blob(chunks, { type: 'audio/webm' });
             chunks.length = 0;
 
             if (lastUrl) URL.revokeObjectURL(lastUrl);
-            
-            // Создаём URL
             lastUrl = URL.createObjectURL(blob);
 
-            // ХИТРОСТЬ: меняем расширение в ссылке на .mp3 для совместимости с iOS
-            // Файл внутри тот же, но iOS часто перестаёт писать "Ошибка" в плеере
-            const fakeMp3Url = lastUrl.replace('.webm', '.mp3');
-
-            playerContainer.style.display = 'block';
-            playerContainer.innerHTML = `<audio controls src="${fakeMp3Url}"></audio>`;
+            // Показываем кнопку «Открыть в телефоне»
+            downloadContainer.style.display = 'block';
+            downloadContainer.innerHTML = `
+              <a href="${lastUrl}" 
+                 download="recording.webm" 
+                 class="download-btn"
+                 target="_blank">
+                 📂 Открыть запись в плеере телефона
+              </a>
+            `;
 
             status.className = 'ok';
             status.innerHTML = `
               <b>✅ Готово!</b><br>
               Размер файла: ${blob.size} байт.<br>
-              Нажми Play. Если снова ошибка — читай ниже.
+              Нажми зелёную кнопку — файл откроется в стандартном плеере iPhone.
             `;
           };
 
@@ -158,7 +170,7 @@
           console.error(err);
           status.className = 'error';
           if (err.name === 'NotAllowedError') {
-            status.textContent = '❌ Доступ к микрофону запрещён.';
+            status.textContent = '❌ Доступ к микрофону запрещён. Проверь настройки Safari.';
           } else {
             status.textContent = `❌ Ошибка: ${err.message}`;
           }
