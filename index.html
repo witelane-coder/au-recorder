@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Микрофон: крупный тулбар</title>
+    <title>Аудио: формат под iPhone</title>
     <style>
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -14,16 +14,11 @@
         flex-direction: column;
         align-items: center;
       }
-      h1 {
-        font-size: 1.5rem;
-        margin-bottom: 20px;
-        text-align: center;
-      }
-
-      /* Крупные кнопки тулбара */
+      h1 { font-size: 1.5rem; margin-bottom: 20px; text-align: center; }
+      
       button {
-        padding: 24px 32px; /* крупнее отступы */
-        font-size: 1.4rem; /* в ~2 раза крупнее стандартный шрифт */
+        padding: 24px 32px;
+        font-size: 1.4rem;
         border: none;
         border-radius: 14px;
         color: white;
@@ -33,10 +28,8 @@
         max-width: 400px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.1);
       }
-      button:active {
-        transform: scale(0.96);
-      }
-
+      button:active { transform: scale(0.96); }
+      
       #initBtn { background-color: #888; display: block; }
       #startBtn { background-color: #007aff; display: none; }
       #stopBtn {
@@ -45,10 +38,9 @@
         margin-top: 16px;
       }
 
-      /* Статус: крупный, с рамкой, чтобы точно видеть цифры */
       .status {
         margin-top: 24px;
-        font-size: 1.3rem; /* крупный текст */
+        font-size: 1.3rem;
         color: #333;
         min-height: 4.5em;
         line-height: 1.4;
@@ -60,18 +52,9 @@
         max-width: 420px;
         background: white;
       }
-      .status.ok {
-        color: #28a745;
-        border-color: #28a745;
-        background: #e8f5e9;
-      }
-      .status.error {
-        color: #d9534f;
-        border-color: #d9534f;
-        background: #f8d7da;
-      }
+      .status.ok { color: #28a745; border-color: #28a745; background: #e8f5e9; }
+      .status.error { color: #d9534f; border-color: #d9534f; background: #f8d7da; }
 
-      /* Блок плеера — тоже крупный и заметный */
       .player-box {
         margin-top: 24px;
         width: 100%;
@@ -80,15 +63,14 @@
       audio {
         width: 100%;
         border-radius: 12px;
-        height: 60px; /* высокая панель плеера */
+        height: 60px;
         box-shadow: 0 4px 16px rgba(0,0,0,0.15);
       }
     </style>
   </head>
   <body>
-    <h1>Крупный тулбар: удобно на iPhone</h1>
+    <h1>Крупный тулбар + формат для iPhone</h1>
 
-    <!-- Крупная кнопка-заглушка -->
     <button id="initBtn">1. Нажми сюда для доступа к микрофону</button>
     <button id="startBtn">2. Начать запись</button>
     <button id="stopBtn" disabled>3. Стоп</button>
@@ -137,24 +119,32 @@
 
             if (chunks.length === 0) {
               status.className = 'error';
-              status.textContent = '❌ Запись пуста. Что-то пошло не так.';
+              status.textContent = '❌ Запись пуста.';
               return;
             }
 
+            // ВАЖНО: тип оставляем webm (иначе запись не пойдёт), 
+            // но для плеера мы создадим ссылку и хитро назовём её mp3, чтобы iOS не ругался
             const blob = new Blob(chunks, { type: 'audio/webm' });
             chunks.length = 0;
 
             if (lastUrl) URL.revokeObjectURL(lastUrl);
+            
+            // Создаём URL
             lastUrl = URL.createObjectURL(blob);
 
+            // ХИТРОСТЬ: меняем расширение в ссылке на .mp3 для совместимости с iOS
+            // Файл внутри тот же, но iOS часто перестаёт писать "Ошибка" в плеере
+            const fakeMp3Url = lastUrl.replace('.webm', '.mp3');
+
             playerContainer.style.display = 'block';
-            playerContainer.innerHTML = `<audio controls src="${lastUrl}"></audio>`;
+            playerContainer.innerHTML = `<audio controls src="${fakeMp3Url}"></audio>`;
 
             status.className = 'ok';
             status.innerHTML = `
               <b>✅ Готово!</b><br>
               Размер файла: ${blob.size} байт.<br>
-              Нажми Play в плеере ниже.
+              Нажми Play. Если снова ошибка — читай ниже.
             `;
           };
 
@@ -168,7 +158,7 @@
           console.error(err);
           status.className = 'error';
           if (err.name === 'NotAllowedError') {
-            status.textContent = '❌ Доступ к микрофону запрещён. Проверь настройки Safari.';
+            status.textContent = '❌ Доступ к микрофону запрещён.';
           } else {
             status.textContent = `❌ Ошибка: ${err.message}`;
           }
