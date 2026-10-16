@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Аудио-тест на хостинге</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background: #f4f4f5;
+        margin: 0;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      h1 { font-size: 1.3rem; margin-bottom: 10px; }
+      .status { margin-top: 12px; font-size: 0.9rem; color: #555; min-height: 1.2em; }
+      button {
+        padding: 16px 24px;
+        font-size: 1rem;
+        border: none;
+        border-radius: 10px;
+        color: white;
+        cursor: pointer;
+        transition: transform 0.1s;
+      }
+      button:active { transform: scale(0.97); }
+      #startBtn { background-color: #007aff; width: 100%; max-width: 300px; }
+      #stopBtn {
+        background-color: #ff3b30;
+        width: 100%;
+        max-width: 300px;
+        margin-top: 8px;
+        display: none;
+      }
+      a.download-link {
+        margin-top: 20px;
+        padding: 14px 22px;
+        background-color: #28a745;
+        color: white;
+        text-decoration: none;
+        border-radius: 10px;
+        display: inline-block;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Тест рекордера</h1>
+    <button id="startBtn">Начать запись</button>
+    <button id="stopBtn" disabled>Стоп</button>
+    <div class="status" id="status"></div>
+
+    <script>
+      let recorder = null;
+      const chunks = [];
+      const startBtn = document.getElementById('startBtn');
+      const stopBtn = document.getElementById('stopBtn');
+      const status = document.getElementById('status');
+
+      startBtn.addEventListener('click', async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          recorder = new MediaRecorder(stream);
+
+          recorder.ondataavailable = e => chunks.push(e.data);
+          recorder.onstop = () => {
+            const blob = new Blob(chunks, { type: 'audio/webm' });
+            chunks.length = 0; // очистка
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'recording.webm';
+            a.className = 'download-link';
+            a.textContent = '✅ Скачать запись';
+
+            status.innerHTML = '';
+            status.appendChild(a);
+          };
+
+          recorder.start();
+          startBtn.disabled = true;
+          stopBtn.style.display = 'block';
+          stopBtn.disabled = false;
+          status.textContent = 'Запись...';
+        } catch (err) {
+          console.error(err);
+          status.textContent = '❌ Ошибка доступа к микрофону';
+        }
+      });
+
+      stopBtn.addEventListener('click', () => {
+        if (recorder) recorder.stop();
+      });
+    </script>
+  </body>
+</html>
