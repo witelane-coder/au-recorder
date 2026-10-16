@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Аудио: авто-подбор формата под Safari</title>
+  <title>Аудио: Safari iOS (без проверок MIME)</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
@@ -63,7 +63,7 @@
   </style>
 </head>
 <body>
-  <h1>Запись аудио (авто-подбор формата)</h1>
+  <h1>Запись аудио (для Safari iOS)</h1>
   <button id="startBtn">Начать запись</button>
   <button id="stopBtn">Стоп</button>
 
@@ -80,43 +80,15 @@
     const status = document.getElementById('status');
     const playerContainer = document.getElementById('playerContainer');
 
-    // Приоритеты форматов: сначала то, что лучше всего работает на iOS
-    const preferredMimes = [
-      'audio/mp4; codecs=aac',   // лучший для Safari на iOS
-      'audio/webm; codecs=opus', // хороший запасной
-      'audio/webm'               // самый простой fallback
-    ];
-
-    function findSupportedMime() {
-      for (const mime of preferredMimes) {
-        if (MediaRecorder.isTypeSupported(mime)) {
-          return mime;
-        }
-      }
-      return null;
-    }
-
-    const selectedMime = findSupportedMime();
-
-    if (!selectedMime) {
-      status.className = 'error';
-      status.textContent = '❌ Ни один из форматов не поддерживается в этом браузере.';
-      console.error('No supported MIME types found');
-    } else {
-      status.className = 'ok';
-      status.textContent = `✅ Поддерживаемый формат: ${selectedMime}`;
-    }
+    // Самый надёжный формат для iOS Safari
+    const mimeType = 'audio/mp4; codecs=aac';
 
     startBtn.addEventListener('click', async () => {
-      if (!selectedMime) {
-        status.className = 'error';
-        status.textContent = '❌ Невозможно начать запись: нет поддерживаемого формата.';
-        return;
-      }
-
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        recorder = new MediaRecorder(stream, { mimeType: selectedMime });
+
+        // Пробуем создать рекордер сразу, без проверок isTypeSupported
+        recorder = new MediaRecorder(stream, { mimeType: mimeType });
 
         recorder.ondataavailable = (e) => {
           chunks.push(e.data);
@@ -136,7 +108,7 @@
             return;
           }
 
-          const blob = new Blob(chunks, { type: selectedMime });
+          const blob = new Blob(chunks, { type: mimeType });
           chunks.length = 0; // очищаем
 
           if (audioUrl) URL.revokeObjectURL(audioUrl);
@@ -148,7 +120,7 @@
           status.className = 'ok';
           status.innerHTML = `
             <b>✅ Готово!</b><br>
-            Формат: ${selectedMime}<br>
+            Формат: ${mimeType}<br>
             Размер: ${blob.size} байт.<br>
             Нажми Play — звук пойдёт сразу.
           `;
@@ -166,7 +138,9 @@
         console.error(err);
         status.className = 'error';
         if (err.name === 'NotAllowedError') {
-          status.textContent = '❌ Доступ запрещён. Проверь настройки Safari.';
+          status.textContent = '❌ Доступ запрещён. Проверь настройки Safari или нажми “Разрешить” в системном окне.';
+        } else if (err.name === 'SecurityError') {
+          status.textContent = '❌ Ошибка безопасности. Страница должна быть по HTTPS (не http://IP).';
         } else {
           status.textContent = `❌ Ошибка: ${err.message}`;
         }
