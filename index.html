@@ -1,150 +1,175 @@
 <!DOCTYPE html>
 <html lang="ru">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Аудио: самый простой вариант</title>
-    <style>
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        background: #f4f4f5;
-        margin: 0;
-        padding: 20px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-      }
-      h1 { font-size: 1.5rem; margin-bottom: 24px; text-align: center; }
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Аудио: Safari-ready (с полифилом)</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background: #f4f4f5;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 24px; text-align: center; }
+    button {
+      padding: 22px 30px;
+      font-size: 1.3rem;
+      border: none;
+      border-radius: 12px;
+      color: white;
+      cursor: pointer;
+      transition: transform 0.1s;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    button:active { transform: scale(0.96); }
+    #startBtn { background-color: #007aff; }
+    #stopBtn {
+      background-color: #ff3b30;
+      margin-top: 16px;
+      display: none;
+    }
+    .status {
+      margin-top: 24px;
+      font-size: 1.2rem;
+      min-height: 3em;
+      line-height: 1.4;
+      text-align: center;
+      border: 2px dashed #aaa;
+      padding: 16px;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 420px;
+      background: white;
+    }
+    .status.ok { color: #28a745; border-color: #28a745; background: #e8f5e9; }
+    .status.error { color: #d9534f; border-color: #d9534f; background: #f8d7da; }
+    .player-box {
+      margin-top: 24px;
+      width: 100%;
+      max-width: 420px;
+    }
+    audio {
+      width: 100%;
+      border-radius: 12px;
+      height: 60px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    }
+  </style>
+</head>
+<body>
+  <h1>Запись аудио (Safari-friendly)</h1>
+  <button id="startBtn">Начать запись</button>
+  <button id="stopBtn">Стоп</button>
 
-      button {
-        padding: 22px 30px;
-        font-size: 1.3rem;
-        border: none;
-        border-radius: 12px;
-        color: white;
-        cursor: pointer;
-        transition: transform 0.1s;
-        width: 100%;
-        max-width: 400px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      }
-      button:active { transform: scale(0.96); }
+  <div class="status" id="status">Готов к записи</div>
+  <div class="player-box" id="playerContainer" style="display:none;"></div>
 
-      #startBtn { background-color: #007aff; }
-      #stopBtn {
-        background-color: #ff3b30;
-        margin-top: 16px;
-        display: none;
-      }
+  <!-- 1. Сначала подгружаем полифил ТОЛЬКО если нативного MediaRecorder нет -->
+  <script>
+    if (!window.MediaRecorder) {
+      // Подключаем polyfill через CDN (версия из репозитория anrikun)
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/mp3-mediarecorder-polyfill@1.0.0/dist/polyfill.js';
+      script.async = true;
+      document.head.appendChild(script);
+      
+      // Ждём, пока скрипт загрузится, прежде чем показывать кнопки
+      script.onload = () => {
+        document.getElementById('startBtn').style.display = 'block';
+        document.getElementById('status').textContent = 'Полифил загружен. Можно начинать.';
+      };
+      script.onerror = () => {
+        document.getElementById('status').className = 'error';
+        document.getElementById('status').textContent = 'Ошибка загрузки полифила. Попробуй без него.';
+        document.getElementById('startBtn').style.display = 'block';
+      };
+    } else {
+      // Если нативный MediaRecorder есть (Chrome, Firefox) — сразу показываем кнопку
+      document.getElementById('startBtn').style.display = 'block';
+    }
+  </script>
 
-      .status {
-        margin-top: 24px;
-        font-size: 1.2rem;
-        min-height: 3em;
-        line-height: 1.4;
-        text-align: center;
-        border: 2px dashed #aaa;
-        padding: 16px;
-        border-radius: 12px;
-        width: 100%;
-        max-width: 420px;
-        background: white;
-      }
-      .status.ok { color: #28a745; border-color: #28a745; background: #e8f5e9; }
-      .status.error { color: #d9534f; border-color: #d9534f; background: #f8d7da; }
+  <!-- 2. Основной код записи -->
+  <script>
+    let recorder = null;
+    const chunks = [];
+    let audioUrl = null;
 
-      .player-box {
-        margin-top: 24px;
-        width: 100%;
-        max-width: 420px;
-      }
-      audio {
-        width: 100%;
-        border-radius: 12px;
-        height: 60px;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-      }
-    </style>
-  </head>
-  <body>
-    <h1>Аудио: без библиотек</h1>
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const status = document.getElementById('status');
+    const playerContainer = document.getElementById('playerContainer');
 
-    <button id="startBtn">Начать запись</button>
-    <button id="stopBtn">Стоп</button>
+    startBtn.addEventListener('click', async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        // Создаём рекордер с приоритетом MP3 — полифил подхватит это автоматически
+        recorder = new MediaRecorder(stream, { mimeType: 'audio/mpeg' });
 
-    <div class="status" id="status">Готов</div>
-    <div class="player-box" id="playerContainer" style="display:none;"></div>
-
-    <script>
-      let recorder = null;
-      const chunks = [];
-      let audioUrl = null;
-
-      const startBtn = document.getElementById('startBtn');
-      const stopBtn = document.getElementById('stopBtn');
-      const status = document.getElementById('status');
-      const playerContainer = document.getElementById('playerContainer');
-
-      startBtn.addEventListener('click', async () => {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          recorder = new MediaRecorder(stream);
-
-          recorder.ondataavailable = (e) => {
-            chunks.push(e.data);
-            const totalSize = chunks.reduce((sum, chunk) => sum + chunk.size, 0);
-            status.className = 'ok';
-            status.textContent = `Пишу… (кусков: ${chunks.length}, байт: ${totalSize})`;
-          };
-
-          recorder.onstop = () => {
-            stopBtn.disabled = true;
-            startBtn.disabled = false;
-
-            if (chunks.length === 0) {
-              status.className = 'error';
-              status.textContent = '❌ Запись пуста.';
-              return;
-            }
-
-            const blob = new Blob(chunks, { type: 'audio/webm' });
-            chunks.length = 0; // очищаем
-
-            // Освобождаем старую ссылку
-            if (audioUrl) URL.revokeObjectURL(audioUrl);
-            audioUrl = URL.createObjectURL(blob);
-
-            playerContainer.style.display = 'block';
-            playerContainer.innerHTML = `<audio controls src="${audioUrl}"></audio>`;
-
-            status.className = 'ok';
-            status.innerHTML = `
-              <b>✅ Готово!</b><br>
-              Размер: ${blob.size} байт.<br>
-              Попробуй нажать Play.
-            `;
-          };
-
-          recorder.start();
-          startBtn.disabled = true;
-          stopBtn.style.display = 'block';
-          stopBtn.disabled = false;
+        recorder.ondataavailable = (e) => {
+          chunks.push(e.data);
+          const totalSize = chunks.reduce((sum, chunk) => sum + chunk.size, 0);
           status.className = 'ok';
-          status.textContent = 'Говори…';
-        } catch (err) {
-          console.error(err);
-          status.className = 'error';
-          if (err.name === 'NotAllowedError') {
-            status.textContent = '❌ Доступ запрещён. Проверь настройки Safari.';
-          } else {
-            status.textContent = `❌ Ошибка: ${err.message}`;
-          }
-        }
-      });
+          status.textContent = `Пишу… (${totalSize} байт)`;
+        };
 
-      stopBtn.addEventListener('click', () => {
-        if (recorder) recorder.stop();
-      });
-    </script>
-  </body>
+        recorder.onstop = () => {
+          stopBtn.disabled = true;
+          startBtn.disabled = false;
+          startBtn.textContent = 'Начать запись';
+
+          if (chunks.length === 0) {
+            status.className = 'error';
+            status.textContent = '❌ Запись пуста.';
+            return;
+          }
+
+          const blob = new Blob(chunks, { type: 'audio/mpeg' });
+          chunks.length = 0; // очищаем массив
+
+          // Освобождаем старую ссылку, чтобы не было утечек памяти
+          if (audioUrl) URL.revokeObjectURL(audioUrl);
+          audioUrl = URL.createObjectURL(blob);
+
+          playerContainer.style.display = 'block';
+          playerContainer.innerHTML = `<audio controls src="${audioUrl}"></audio>`;
+
+          status.className = 'ok';
+          status.innerHTML = `
+            <b>✅ Готово!</b><br>
+            Размер: ${blob.size} байт.<br>
+            Нажми Play — звук пойдёт сразу.
+          `;
+        };
+
+        recorder.start();
+        startBtn.disabled = true;
+        startBtn.textContent = 'Запись идёт...';
+        stopBtn.style.display = 'block';
+        stopBtn.disabled = false;
+        status.className = 'ok';
+        status.textContent = 'Говори...';
+      } catch (err) {
+        console.error(err);
+        status.className = 'error';
+        if (err.name === 'NotAllowedError') {
+          status.textContent = '❌ Доступ запрещён. Проверь настройки Safari.';
+        } else {
+          status.textContent = `❌ Ошибка: ${err.message}`;
+        }
+      }
+    });
+
+    stopBtn.addEventListener('click', () => {
+      if (recorder) recorder.stop();
+    });
+  </script>
+</body>
 </html>
