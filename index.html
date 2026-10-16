@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Аудио: скачать и открыть в телефоне</title>
+    <title>Аудио: запись + авто-конвертация в MP3</title>
     <style>
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -14,11 +14,7 @@
         flex-direction: column;
         align-items: center;
       }
-      h1 {
-        font-size: 1.5rem;
-        margin-bottom: 20px;
-        text-align: center;
-      }
+      h1 { font-size: 1.5rem; margin-bottom: 20px; text-align: center; }
 
       button {
         padding: 24px 32px;
@@ -32,9 +28,7 @@
         max-width: 400px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.1);
       }
-      button:active {
-        transform: scale(0.96);
-      }
+      button:active { transform: scale(0.96); }
 
       #initBtn { background-color: #888; display: block; }
       #startBtn { background-color: #007aff; display: none; }
@@ -61,44 +55,48 @@
       .status.ok { color: #28a745; border-color: #28a745; background: #e8f5e9; }
       .status.error { color: #d9534f; border-color: #d9534f; background: #f8d7da; }
 
-      /* Кнопка скачивания/открытия — крупная и заметная */
-      .download-btn {
-        display: inline-block;
+      .player-box {
         margin-top: 24px;
-        padding: 22px 30px;
-        font-size: 1.35rem;
-        background: #28a745;
-        color: white;
-        text-decoration: none;
-        border-radius: 14px;
-        box-shadow: 0 6px 18px rgba(40, 167, 69, 0.3);
-        font-weight: 600;
-        transition: transform 0.1s;
+        width: 100%;
+        max-width: 420px;
       }
-      .download-btn:active { transform: scale(0.97); }
+      audio {
+        width: 100%;
+        border-radius: 12px;
+        height: 60px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      }
     </style>
   </head>
   <body>
-    <h1>Крупный тулбар + открыть в телефоне</h1>
+    <h1>Запись + авто-конвертация в MP3</h1>
 
-    <button id="initBtn">1. Нажми сюда для доступа к микрофону</button>
+    <button id="initBtn">1. Доступ к микрофону</button>
     <button id="startBtn">2. Начать запись</button>
     <button id="stopBtn" disabled>3. Стоп</button>
 
     <div class="status" id="status">Готов к тесту</div>
-    <!-- Сюда появится кнопка скачивания -->
-    <div id="downloadContainer" style="display:none;"></div>
+    <div class="player-box" id="playerContainer" style="display:none;"></div>
+
+    <!-- Подключаем библиотеку для конвертации WebM -> MP3 -->
+    <script src="https://unpkg.com/mic-recorder-to-mp3@2.0.2/dist/mic-recorder-to-mp3.min.js"></script>
 
     <script>
       let recorder = null;
       const chunks = [];
       let lastUrl = null;
 
+      // Инициализируем библиотеку
+      const MicRecorder = window.MicRecorder;
+      const micRecorder = new MicRecorder({
+        bitRate: 128
+      });
+
       const initBtn = document.getElementById('initBtn');
       const startBtn = document.getElementById('startBtn');
       const stopBtn = document.getElementById('stopBtn');
       const status = document.getElementById('status');
-      const downloadContainer = document.getElementById('downloadContainer');
+      const playerContainer = document.getElementById('playerContainer');
 
       initBtn.addEventListener('click', () => {
         initBtn.style.display = 'none';
@@ -109,63 +107,17 @@
 
       startBtn.addEventListener('click', async () => {
         try {
+          // Запрашиваем доступ к микрофону
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          recorder = new MediaRecorder(stream);
+          
+          // Начинаем запись через библиотеку (она сама управляет MediaRecorder)
+          micRecorder.start(stream);
 
-          recorder.ondataavailable = (e) => {
-            chunks.push(e.data);
-            const totalSize = chunks.reduce((sum, chunk) => sum + chunk.size, 0);
-            status.className = 'ok';
-            status.innerHTML = `
-              <b>✅ Идёт запись...</b><br>
-              <span style="font-size:1.4rem; font-weight:bold;">
-                Кусков: ${chunks.length} | Байт: ${totalSize}
-              </span>
-            `;
-          };
-
-          recorder.onstop = () => {
-            stopBtn.disabled = true;
-            startBtn.disabled = false;
-
-            if (chunks.length === 0) {
-              status.className = 'error';
-              status.textContent = '❌ Запись пуста. Что-то пошло не так.';
-              return;
-            }
-
-            // Формат остаётся webm — он единственный рабочий для записи
-            const blob = new Blob(chunks, { type: 'audio/webm' });
-            chunks.length = 0;
-
-            if (lastUrl) URL.revokeObjectURL(lastUrl);
-            lastUrl = URL.createObjectURL(blob);
-
-            // Показываем кнопку «Открыть в телефоне»
-            downloadContainer.style.display = 'block';
-            downloadContainer.innerHTML = `
-              <a href="${lastUrl}" 
-                 download="recording.webm" 
-                 class="download-btn"
-                 target="_blank">
-                 📂 Открыть запись в плеере телефона
-              </a>
-            `;
-
-            status.className = 'ok';
-            status.innerHTML = `
-              <b>✅ Готово!</b><br>
-              Размер файла: ${blob.size} байт.<br>
-              Нажми зелёную кнопку — файл откроется в стандартном плеере iPhone.
-            `;
-          };
-
-          recorder.start();
+          status.className = 'ok';
+          status.textContent = 'Говори что-нибудь...';
           startBtn.disabled = true;
           stopBtn.style.display = 'block';
           stopBtn.disabled = false;
-          status.className = 'ok';
-          status.textContent = 'Говори что-нибудь...';
         } catch (err) {
           console.error(err);
           status.className = 'error';
@@ -178,7 +130,29 @@
       });
 
       stopBtn.addEventListener('click', () => {
-        if (recorder) recorder.stop();
+        stopBtn.disabled = true;
+        status.className = 'ok';
+        status.textContent = '⏳ Конвертация в MP3...';
+
+        // Останавливаем запись и конвертируем в MP3
+        micRecorder.stop().getMp3().then((blob) => {
+          if (lastUrl) URL.revokeObjectURL(lastUrl);
+          lastUrl = URL.createObjectURL(blob);
+
+          playerContainer.style.display = 'block';
+          playerContainer.innerHTML = `<audio controls src="${lastUrl}"></audio>`;
+
+          status.className = 'ok';
+          status.innerHTML = `
+            <b>✅ Готово!</b><br>
+            Размер файла: ${blob.size} байт.<br>
+            Нажми Play — звук пойдёт сразу.
+          `;
+        }).catch((e) => {
+          console.error(e);
+          status.className = 'error';
+          status.textContent = '❌ Ошибка конвертации. Попробуй ещё раз.';
+        });
       });
     </script>
   </body>
