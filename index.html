@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Аудио: запись + авто-конвертация в MP3</title>
+    <title>Аудио: самый простой вариант</title>
     <style>
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -14,13 +14,13 @@
         flex-direction: column;
         align-items: center;
       }
-      h1 { font-size: 1.5rem; margin-bottom: 20px; text-align: center; }
+      h1 { font-size: 1.5rem; margin-bottom: 24px; text-align: center; }
 
       button {
-        padding: 24px 32px;
-        font-size: 1.4rem;
+        padding: 22px 30px;
+        font-size: 1.3rem;
         border: none;
-        border-radius: 14px;
+        border-radius: 12px;
         color: white;
         cursor: pointer;
         transition: transform 0.1s;
@@ -30,24 +30,22 @@
       }
       button:active { transform: scale(0.96); }
 
-      #initBtn { background-color: #888; display: block; }
-      #startBtn { background-color: #007aff; display: none; }
+      #startBtn { background-color: #007aff; }
       #stopBtn {
         background-color: #ff3b30;
-        display: none;
         margin-top: 16px;
+        display: none;
       }
 
       .status {
         margin-top: 24px;
-        font-size: 1.3rem;
-        color: #333;
-        min-height: 4.5em;
+        font-size: 1.2rem;
+        min-height: 3em;
         line-height: 1.4;
         text-align: center;
-        border: 3px dashed #ccc;
-        padding: 20px;
-        border-radius: 14px;
+        border: 2px dashed #aaa;
+        padding: 16px;
+        border-radius: 12px;
         width: 100%;
         max-width: 420px;
         background: white;
@@ -69,50 +67,70 @@
     </style>
   </head>
   <body>
-    <h1>Запись + авто-конвертация в MP3</h1>
+    <h1>Аудио: без библиотек</h1>
 
-    <button id="initBtn">1. Доступ к микрофону</button>
-    <button id="startBtn">2. Начать запись</button>
-    <button id="stopBtn" disabled>3. Стоп</button>
+    <button id="startBtn">Начать запись</button>
+    <button id="stopBtn">Стоп</button>
 
-    <div class="status" id="status">Готов к тесту</div>
+    <div class="status" id="status">Готов</div>
     <div class="player-box" id="playerContainer" style="display:none;"></div>
-
-    <!-- Библиотека для конвертации WebM -> MP3 -->
-    <script src="https://unpkg.com/mic-recorder-to-mp3@2.0.2/dist/mic-recorder-to-mp3.min.js"></script>
 
     <script>
       let recorder = null;
       const chunks = [];
-      let lastUrl = null;
+      let audioUrl = null;
 
-      // Инициализация конвертера
-      const MicRecorder = window.MicRecorder;
-      const micRecorder = new MicRecorder({ bitRate: 128 });
-
-      const initBtn = document.getElementById('initBtn');
       const startBtn = document.getElementById('startBtn');
       const stopBtn = document.getElementById('stopBtn');
       const status = document.getElementById('status');
       const playerContainer = document.getElementById('playerContainer');
 
-      initBtn.addEventListener('click', () => {
-        initBtn.style.display = 'none';
-        startBtn.style.display = 'block';
-        status.className = '';
-        status.textContent = 'Теперь нажми “Начать запись”';
-      });
-
       startBtn.addEventListener('click', async () => {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          micRecorder.start(stream);
+          recorder = new MediaRecorder(stream);
 
-          status.className = 'ok';
-          status.textContent = 'Говори что-нибудь...';
+          recorder.ondataavailable = (e) => {
+            chunks.push(e.data);
+            const totalSize = chunks.reduce((sum, chunk) => sum + chunk.size, 0);
+            status.className = 'ok';
+            status.textContent = `Пишу… (кусков: ${chunks.length}, байт: ${totalSize})`;
+          };
+
+          recorder.onstop = () => {
+            stopBtn.disabled = true;
+            startBtn.disabled = false;
+
+            if (chunks.length === 0) {
+              status.className = 'error';
+              status.textContent = '❌ Запись пуста.';
+              return;
+            }
+
+            const blob = new Blob(chunks, { type: 'audio/webm' });
+            chunks.length = 0; // очищаем
+
+            // Освобождаем старую ссылку
+            if (audioUrl) URL.revokeObjectURL(audioUrl);
+            audioUrl = URL.createObjectURL(blob);
+
+            playerContainer.style.display = 'block';
+            playerContainer.innerHTML = `<audio controls src="${audioUrl}"></audio>`;
+
+            status.className = 'ok';
+            status.innerHTML = `
+              <b>✅ Готово!</b><br>
+              Размер: ${blob.size} байт.<br>
+              Попробуй нажать Play.
+            `;
+          };
+
+          recorder.start();
           startBtn.disabled = true;
           stopBtn.style.display = 'block';
           stopBtn.disabled = false;
+          status.className = 'ok';
+          status.textContent = 'Говори…';
         } catch (err) {
           console.error(err);
           status.className = 'error';
@@ -125,28 +143,7 @@
       });
 
       stopBtn.addEventListener('click', () => {
-        stopBtn.disabled = true;
-        status.className = 'ok';
-        status.textContent = '⏳ Конвертация в MP3...';
-
-        micRecorder.stop().getMp3().then((blob) => {
-          if (lastUrl) URL.revokeObjectURL(lastUrl);
-          lastUrl = URL.createObjectURL(blob);
-
-          playerContainer.style.display = 'block';
-          playerContainer.innerHTML = `<audio controls src="${lastUrl}"></audio>`;
-
-          status.className = 'ok';
-          status.innerHTML = `
-            <b>✅ Готово!</b><br>
-            Размер файла: ${blob.size} байт.<br>
-            Нажми Play — звук пойдёт сразу.
-          `;
-        }).catch((e) => {
-          console.error(e);
-          status.className = 'error';
-          status.textContent = '❌ Ошибка конвертации. Попробуй ещё раз.';
-        });
+        if (recorder) recorder.stop();
       });
     </script>
   </body>
