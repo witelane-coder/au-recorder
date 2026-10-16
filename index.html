@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Тест микрофона: только цифры</title>
+    <title>Микрофон: крупный тулбар</title>
     <style>
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -14,93 +14,119 @@
         flex-direction: column;
         align-items: center;
       }
-      h1 { font-size: 1.3rem; margin-bottom: 10px; }
-      
-      /* Статус делаем БОЛЬШИМ, чтобы не пропустить цифры */
-      .status {
-        margin-top: 20px;
-        font-size: 1.1rem;
-        color: #333;
-        min-height: 3em;
+      h1 {
+        font-size: 1.5rem;
+        margin-bottom: 20px;
         text-align: center;
-        border: 2px dashed #ccc;
-        padding: 15px;
-        border-radius: 12px;
-        width: 100%;
-        max-width: 400px;
       }
-      .status.ok { color: #28a745; border-color: #28a745; background: #e8f5e9; }
-      .status.error { color: #d9534f; border-color: #d9534f; background: #f8d7da; }
 
+      /* Крупные кнопки тулбара */
       button {
-        padding: 16px 24px;
-        font-size: 1rem;
+        padding: 24px 32px; /* крупнее отступы */
+        font-size: 1.4rem; /* в ~2 раза крупнее стандартный шрифт */
         border: none;
-        border-radius: 10px;
+        border-radius: 14px;
         color: white;
         cursor: pointer;
         transition: transform 0.1s;
         width: 100%;
-        max-width: 300px;
+        max-width: 400px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
       }
-      button:active { transform: scale(0.97); }
-      
+      button:active {
+        transform: scale(0.96);
+      }
+
       #initBtn { background-color: #888; display: block; }
       #startBtn { background-color: #007aff; display: none; }
       #stopBtn {
         background-color: #ff3b30;
         display: none;
-        margin-top: 10px;
+        margin-top: 16px;
+      }
+
+      /* Статус: крупный, с рамкой, чтобы точно видеть цифры */
+      .status {
+        margin-top: 24px;
+        font-size: 1.3rem; /* крупный текст */
+        color: #333;
+        min-height: 4.5em;
+        line-height: 1.4;
+        text-align: center;
+        border: 3px dashed #ccc;
+        padding: 20px;
+        border-radius: 14px;
+        width: 100%;
+        max-width: 420px;
+        background: white;
+      }
+      .status.ok {
+        color: #28a745;
+        border-color: #28a745;
+        background: #e8f5e9;
+      }
+      .status.error {
+        color: #d9534f;
+        border-color: #d9534f;
+        background: #f8d7da;
+      }
+
+      /* Блок плеера — тоже крупный и заметный */
+      .player-box {
+        margin-top: 24px;
+        width: 100%;
+        max-width: 420px;
+      }
+      audio {
+        width: 100%;
+        border-radius: 12px;
+        height: 60px; /* высокая панель плеера */
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15);
       }
     </style>
   </head>
   <body>
-    <h1>Тест: считаем байты</h1>
+    <h1>Крупный тулбар: удобно на iPhone</h1>
 
-    <!-- Кнопка-заглушка, без неё iOS не покажет окно доступа -->
+    <!-- Крупная кнопка-заглушка -->
     <button id="initBtn">1. Нажми сюда для доступа к микрофону</button>
     <button id="startBtn">2. Начать запись</button>
     <button id="stopBtn" disabled>3. Стоп</button>
-    
-    <!-- Сюда будут падать цифры -->
+
     <div class="status" id="status">Готов к тесту</div>
+    <div class="player-box" id="playerContainer" style="display:none;"></div>
 
     <script>
       let recorder = null;
       const chunks = [];
-      
+      let lastUrl = null;
+
       const initBtn = document.getElementById('initBtn');
       const startBtn = document.getElementById('startBtn');
       const stopBtn = document.getElementById('stopBtn');
       const status = document.getElementById('status');
+      const playerContainer = document.getElementById('playerContainer');
 
-      // Шаг 1: показываем кнопку старта
       initBtn.addEventListener('click', () => {
         initBtn.style.display = 'none';
         startBtn.style.display = 'block';
         status.className = '';
-        status.textContent = 'Теперь нажми "Начать запись"';
+        status.textContent = 'Теперь нажми “Начать запись”';
       });
 
-      // Шаг 2: запрашиваем доступ
       startBtn.addEventListener('click', async () => {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           recorder = new MediaRecorder(stream);
 
-          // ГЛАВНОЕ: каждый раз, когда браузер отдает кусок данных, мы считаем его размер
           recorder.ondataavailable = (e) => {
             chunks.push(e.data);
             const totalSize = chunks.reduce((sum, chunk) => sum + chunk.size, 0);
-            
-            // Обновляем статус в реальном времени!
             status.className = 'ok';
             status.innerHTML = `
               <b>✅ Идёт запись...</b><br>
-              <br>
               <span style="font-size:1.4rem; font-weight:bold;">
-                Кусков: ${chunks.length}<br>
-                Всего байт: ${totalSize}
+                Кусков: ${chunks.length} | Байт: ${totalSize}
               </span>
             `;
           };
@@ -108,43 +134,27 @@
           recorder.onstop = () => {
             stopBtn.disabled = true;
             startBtn.disabled = false;
-            
+
             if (chunks.length === 0) {
               status.className = 'error';
-              status.innerHTML = `
-                <b>❌ Запись пуста!</b><br><br>
-                Браузер не записал ни одного байта.<br>
-                Это значит, что доступ к микрофону всё ещё заблокирован.<br><br>
-                Проверь:<br>
-                1. Не обновлял ли ты страницу после нажатия "Разрешить"?<br>
-                2. В Настройках iPhone → Safari → Камера и микрофон стоит "Разрешить".
-              `;
+              status.textContent = '❌ Запись пуста. Что-то пошло не так.';
               return;
             }
 
             const blob = new Blob(chunks, { type: 'audio/webm' });
-            chunks.length = 0; // очищаем память
+            chunks.length = 0;
 
-            // Создаем ссылку для скачивания (просто чтобы файл был)
-            const url = URL.createObjectURL(blob);
-            
+            if (lastUrl) URL.revokeObjectURL(lastUrl);
+            lastUrl = URL.createObjectURL(blob);
+
+            playerContainer.style.display = 'block';
+            playerContainer.innerHTML = `<audio controls src="${lastUrl}"></audio>`;
+
             status.className = 'ok';
             status.innerHTML = `
-              <b>✅ ГОТОВО!</b><br><br>
-              <span style="font-size:1.4rem; font-weight:bold; color:#007bff;">
-                Всего записано: ${blob.size} байт
-              </span><br><br>
-              Если видишь эти цифры — микрофон РАБОТАЕТ.<br>
-              (Плеер добавим позже, сейчас главное — цифры).
-              <br><br>
-              <a href="${url}" download="test.webm" style="
-                display:inline-block; 
-                padding:10px 20px; 
-                background:#28a745; 
-                color:white; 
-                text-decoration:none; 
-                border-radius:8px;
-              ">⬇️ Скачать файл</a>
+              <b>✅ Готово!</b><br>
+              Размер файла: ${blob.size} байт.<br>
+              Нажми Play в плеере ниже.
             `;
           };
 
@@ -158,9 +168,9 @@
           console.error(err);
           status.className = 'error';
           if (err.name === 'NotAllowedError') {
-             status.textContent = '❌ Ошибка: доступ к микрофону запрещён. Проверь настройки Safari.';
+            status.textContent = '❌ Доступ к микрофону запрещён. Проверь настройки Safari.';
           } else {
-             status.textContent = `❌ Ошибка: ${err.message}`;
+            status.textContent = `❌ Ошибка: ${err.message}`;
           }
         }
       });
