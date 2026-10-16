@@ -26,7 +26,8 @@
         transition: transform 0.1s;
       }
       button:active { transform: scale(0.97); }
-      #startBtn { background-color: #007aff; width: 100%; max-width: 300px; }
+      #initBtn { background-color: #888; width: 100%; max-width: 300px; }
+      #startBtn { background-color: #007aff; width: 100%; max-width: 300px; display: none; }
       #stopBtn {
         background-color: #ff3b30;
         width: 100%;
@@ -34,19 +35,27 @@
         margin-top: 8px;
         display: none;
       }
+      .action-buttons button {
+        margin-top: 10px;
+        padding: 12px 20px;
+      }
       a.download-link {
-        margin-top: 20px;
-        padding: 14px 22px;
+        display: inline-block;
+        margin-top: 10px;
+        padding: 12px 20px;
         background-color: #28a745;
         color: white;
         text-decoration: none;
         border-radius: 10px;
-        display: inline-block;
       }
     </style>
   </head>
   <body>
     <h1>Тест рекордера</h1>
+
+    <!-- Кнопка-заглушка: нужна именно для iOS, чтобы появился запрос доступа -->
+    <button id="initBtn">Нажми сюда, чтобы разрешить микрофон</button>
+
     <button id="startBtn">Начать запись</button>
     <button id="stopBtn" disabled>Стоп</button>
     <div class="status" id="status"></div>
@@ -54,29 +63,54 @@
     <script>
       let recorder = null;
       const chunks = [];
+      let lastUrl = null; // для освобождения памяти
+
+      const initBtn = document.getElementById('initBtn');
       const startBtn = document.getElementById('startBtn');
       const stopBtn = document.getElementById('stopBtn');
       const status = document.getElementById('status');
 
+      // Шаг 1: сначала показываем кнопку-заглушку, чтобы «разблокировать» браузер
+      initBtn.addEventListener('click', () => {
+        initBtn.style.display = 'none';
+        startBtn.style.display = 'block';
+        status.textContent = 'Теперь нажми “Начать запись”';
+      });
+
+      // Шаг 2: запрашиваем микрофон только после «доверенного действия»
       startBtn.addEventListener('click', async () => {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           recorder = new MediaRecorder(stream);
 
           recorder.ondataavailable = e => chunks.push(e.data);
+
           recorder.onstop = () => {
+            // Освобождаем предыдущую ссылку, чтобы не забивать память
+            if (lastUrl) URL.revokeObjectURL(lastUrl);
+
             const blob = new Blob(chunks, { type: 'audio/webm' });
-            chunks.length = 0; // очистка
+            chunks.length = 0; // очищаем массив
 
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'recording.webm';
-            a.className = 'download-link';
-            a.textContent = '✅ Скачать запись';
+            lastUrl = URL.createObjectURL(blob);
 
-            status.innerHTML = '';
-            status.appendChild(a);
+            // Показываем кнопки: послушать и скачать
+            status.innerHTML = `
+              <b>✅ Готово!</b><br>
+              <div class="action-buttons">
+                <button id="playBtn" style="background-color: #007bff;">🔊 Послушать запись</button>
+                <a href="${lastUrl}" download="recording.webm" class="download-link">⬇️ Скачать .webm</a>
+              </div>
+            `;
+
+            document.getElementById('playBtn').addEventListener('click', () => {
+              const audio = new Audio(lastUrl);
+              audio.controls = true;
+              audio.style.width = '100%';
+              status.innerHTML = '';
+              status.appendChild(audio);
+              audio.play().catch(e => console.error('Автовоспроизведение заблокировано', e));
+            });
           };
 
           recorder.start();
