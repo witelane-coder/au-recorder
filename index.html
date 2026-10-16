@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Аудио-тест на хостинге</title>
+    <title>Аудио-тест: точная диагностика</title>
     <style>
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -15,7 +15,20 @@
         align-items: center;
       }
       h1 { font-size: 1.3rem; margin-bottom: 10px; }
-      .status { margin-top: 12px; font-size: 0.9rem; color: #555; min-height: 1.2em; line-height: 1.4; }
+      .status {
+        margin-top: 12px;
+        font-size: 0.9rem;
+        color: #555;
+        min-height: 1.2em;
+        line-height: 1.4;
+        text-align: left;
+        border: 1px solid #ddd;
+        padding: 10px;
+        border-radius: 8px;
+        background: white;
+      }
+      .status.error { color: #d9534f; border-color: #d9534f; }
+      .status.success { color: #28a745; border-color: #28a745; }
       button {
         padding: 16px 24px;
         font-size: 1rem;
@@ -35,11 +48,7 @@
         margin-top: 8px;
         display: none;
       }
-      .controls-box {
-        margin-top: 15px;
-        text-align: center;
-        width: 100%;
-      }
+      .controls-box { margin-top: 15px; text-align: center; width: 100%; }
       audio {
         width: 100%;
         background: white;
@@ -58,9 +67,9 @@
     </style>
   </head>
   <body>
-    <h1>Тест рекордера</h1>
+    <h1>Тест рекордера: диагностика</h1>
 
-    <!-- Кнопка-заглушка: нужна для iOS, чтобы появился запрос доступа -->
+    <!-- Кнопка-заглушка: обязательна для iOS, чтобы появился запрос доступа -->
     <button id="initBtn">Нажми сюда, чтобы разрешить микрофон</button>
     <button id="startBtn">Начать запись</button>
     <button id="stopBtn" disabled>Стоп</button>
@@ -80,6 +89,7 @@
       initBtn.addEventListener('click', () => {
         initBtn.style.display = 'none';
         startBtn.style.display = 'block';
+        status.className = '';
         status.textContent = 'Теперь нажми “Начать запись”';
       });
 
@@ -89,14 +99,28 @@
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           recorder = new MediaRecorder(stream);
 
-          recorder.ondataavailable = e => chunks.push(e.data);
+          // Отслеживаем, пишет ли браузер вообще куски аудио
+          recorder.ondataavailable = e => {
+            chunks.push(e.data);
+            console.log('✅ Записан кусок аудио:', e.data.size, 'байт');
+          };
 
           recorder.onstop = () => {
             // Освобождаем предыдущую ссылку, чтобы не забивать память
             if (lastUrl) URL.revokeObjectURL(lastUrl);
 
+            status.className = '';
+
             if (chunks.length === 0) {
-              status.innerHTML = '<span style="color:#d9534f">⚠️ Запись пуста: не удалось захватить аудио.</span>';
+              status.className = 'error';
+              status.innerHTML = `
+                <b>⚠️ Запись пуста</b><br>
+                Браузер не записал ни одного куска аудио.<br>
+                Возможные причины:<br>
+                1. Не дал разрешение на микрофон (или нажал «Запретить»).<br>
+                2. Микрофон физически выключен.<br>
+                3. В настройках Safari сброшены разрешения для сайта.
+              `;
               return;
             }
 
@@ -106,8 +130,10 @@
             lastUrl = URL.createObjectURL(blob);
 
             // Показываем плеер и кнопку скачивания
+            status.className = 'success';
             status.innerHTML = `
               <b>✅ Готово!</b><br>
+              Записано кусков: ${chunks.length || 'N/A'} (в памяти уже очищено)<br>
               <div class="controls-box">
                 <audio controls src="${lastUrl}"></audio>
                 <br>
@@ -120,10 +146,19 @@
           startBtn.disabled = true;
           stopBtn.style.display = 'block';
           stopBtn.disabled = false;
-          status.textContent = 'Запись...';
+          status.className = '';
+          status.textContent = 'Запись... (скажи что-нибудь)';
         } catch (err) {
           console.error(err);
-          status.innerHTML = `<span style="color:#d9534f">❌ Ошибка доступа к микрофону: ${err.message || 'Неизвестная ошибка'}</span>`;
+          status.className = 'error';
+          // Показываем понятную причину ошибки
+          if (err.name === 'NotAllowedError') {
+            status.innerHTML = '<b>❌ Нет доступа к микрофону</b><br>Ты нажал “Запретить” или разрешение сброшено в настройках Safari.';
+          } else if (err.name === 'NotFoundError') {
+            status.innerHTML = '<b>❌ Микрофон не найден</b><br>Устройство не видит аудиовход (проверь, не выключен ли физически).';
+          } else {
+            status.innerHTML = `<b>❌ Ошибка:</b> ${err.message || 'Неизвестная ошибка'}<br>Смотри консоль (F12) для деталей.`;
+          }
         }
       });
 
