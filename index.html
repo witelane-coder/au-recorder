@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Аудио-тест (MP4 для iPhone)</title>
+    <title>Аудио-тест (Шаг 1)</title>
     <style>
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -27,96 +27,20 @@
       }
       button:active { transform: scale(0.97); }
       #startBtn { background-color: #007aff; width: 100%; max-width: 300px; }
-      #stopBtn {
-        background-color: #ff3b30;
-        width: 100%;
-        max-width: 300px;
-        margin-top: 8px;
-        display: none;
-      }
-      .action-buttons button,
-      .action-buttons a {
-        margin-top: 10px;
-        padding: 12px 20px;
-        text-decoration: none;
-        border-radius: 10px;
-        color: white;
-      }
-      a.download-link {
-        display: inline-block;
-        background-color: #28a745;
-      }
     </style>
   </head>
   <body>
-    <h1>Тест рекордера (MP4)</h1>
-
+    <h1>Тест рекордера — Шаг 1</h1>
     <button id="startBtn">Начать запись</button>
-    <button id="stopBtn" disabled>Стоп</button>
     <div class="status" id="status"></div>
 
     <script>
-      let recorder = null;
-      const chunks = [];
-      let lastUrl = null;
-
       const startBtn = document.getElementById('startBtn');
-      const stopBtn = document.getElementById('stopBtn');
       const status = document.getElementById('status');
 
-      startBtn.addEventListener('click', async () => {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-          // ГЛАВНОЕ ИЗМЕНЕНИЕ:
-          // Safari на iPhone умеет ТОЛЬКО писать в этот формат.
-          // Это сразу готовый MP4 с AAC внутри. Конвертация не нужна.
-          const options = { mimeType: 'audio/mp4; codecs=aac' };
-          recorder = new MediaRecorder(stream, options);
-
-          recorder.ondataavailable = e => chunks.push(e.data);
-
-          recorder.onstop = () => {
-            if (lastUrl) URL.revokeObjectURL(lastUrl);
-
-            // Теперь это реально MP4 файл
-            const blob = new Blob(chunks, { type: 'audio/mp4' });
-            chunks.length = 0;
-
-            lastUrl = URL.createObjectURL(blob);
-
-            status.innerHTML = `
-              <b>✅ Готово!</b><br>
-              <div class="action-buttons">
-                <button onclick="playAudio('${lastUrl}')" style="background-color: #007bff;">🔊 Послушать</button>
-                <a href="${lastUrl}" download="recording.mp4" class="download-link">⬇️ Скачать .mp4</a>
-              </div>
-            `;
-          };
-
-          recorder.start();
-          startBtn.disabled = true;
-          stopBtn.style.display = 'block';
-          stopBtn.disabled = false;
-          status.textContent = 'Запись...';
-        } catch (err) {
-          console.error(err);
-          status.textContent = '❌ Ошибка доступа к микрофону. Проверь разрешения в Safari.';
-        }
+      startBtn.addEventListener('click', () => {
+        status.textContent = 'Кнопка работает! Переходим к шагу 2.';
       });
-
-      stopBtn.addEventListener('click', () => {
-        if (recorder) recorder.stop();
-      });
-
-      function playAudio(url) {
-        const audio = new Audio(url);
-        audio.controls = true;
-        audio.style.width = '100%';
-        status.innerHTML = '';
-        status.appendChild(audio);
-        audio.play().catch(e => console.log('Автоплей заблокирован браузером'));
-      }
     </script>
   </body>
 </html>
