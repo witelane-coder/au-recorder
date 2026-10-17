@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Аудио-тест на хостинге</title>
+    <title>Аудио-тест (MP4 для iPhone)</title>
     <style>
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -26,8 +26,7 @@
         transition: transform 0.1s;
       }
       button:active { transform: scale(0.97); }
-      #initBtn { background-color: #888; width: 100%; max-width: 300px; }
-      #startBtn { background-color: #007aff; width: 100%; max-width: 300px; display: none; }
+      #startBtn { background-color: #007aff; width: 100%; max-width: 300px; }
       #stopBtn {
         background-color: #ff3b30;
         width: 100%;
@@ -35,26 +34,22 @@
         margin-top: 8px;
         display: none;
       }
-      .action-buttons button {
+      .action-buttons button,
+      .action-buttons a {
         margin-top: 10px;
         padding: 12px 20px;
+        text-decoration: none;
+        border-radius: 10px;
+        color: white;
       }
       a.download-link {
         display: inline-block;
-        margin-top: 10px;
-        padding: 12px 20px;
         background-color: #28a745;
-        color: white;
-        text-decoration: none;
-        border-radius: 10px;
       }
     </style>
   </head>
   <body>
-    <h1>Тест рекордера</h1>
-
-    <!-- Кнопка-заглушка: нужна именно для iOS, чтобы появился запрос доступа -->
-    <button id="initBtn">Нажми сюда, чтобы разрешить микрофон</button>
+    <h1>Тест рекордера (MP4)</h1>
 
     <button id="startBtn">Начать запись</button>
     <button id="stopBtn" disabled>Стоп</button>
@@ -63,54 +58,40 @@
     <script>
       let recorder = null;
       const chunks = [];
-      let lastUrl = null; // для освобождения памяти
+      let lastUrl = null;
 
-      const initBtn = document.getElementById('initBtn');
       const startBtn = document.getElementById('startBtn');
       const stopBtn = document.getElementById('stopBtn');
       const status = document.getElementById('status');
 
-      // Шаг 1: сначала показываем кнопку-заглушку, чтобы «разблокировать» браузер
-      initBtn.addEventListener('click', () => {
-        initBtn.style.display = 'none';
-        startBtn.style.display = 'block';
-        status.textContent = 'Теперь нажми “Начать запись”';
-      });
-
-      // Шаг 2: запрашиваем микрофон только после «доверенного действия»
       startBtn.addEventListener('click', async () => {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          recorder = new MediaRecorder(stream);
+
+          // ГЛАВНОЕ ИЗМЕНЕНИЕ:
+          // Safari на iPhone умеет ТОЛЬКО писать в этот формат.
+          // Это сразу готовый MP4 с AAC внутри. Конвертация не нужна.
+          const options = { mimeType: 'audio/mp4; codecs=aac' };
+          recorder = new MediaRecorder(stream, options);
 
           recorder.ondataavailable = e => chunks.push(e.data);
 
           recorder.onstop = () => {
-            // Освобождаем предыдущую ссылку, чтобы не забивать память
             if (lastUrl) URL.revokeObjectURL(lastUrl);
 
-            const blob = new Blob(chunks, { type: 'audio/webm' });
-            chunks.length = 0; // очищаем массив
+            // Теперь это реально MP4 файл
+            const blob = new Blob(chunks, { type: 'audio/mp4' });
+            chunks.length = 0;
 
             lastUrl = URL.createObjectURL(blob);
 
-            // Показываем кнопки: послушать и скачать
             status.innerHTML = `
               <b>✅ Готово!</b><br>
               <div class="action-buttons">
-                <button id="playBtn" style="background-color: #007bff;">🔊 Послушать запись</button>
-                <a href="${lastUrl}" download="recording.webm" class="download-link">⬇️ Скачать .webm</a>
+                <button onclick="playAudio('${lastUrl}')" style="background-color: #007bff;">🔊 Послушать</button>
+                <a href="${lastUrl}" download="recording.mp4" class="download-link">⬇️ Скачать .mp4</a>
               </div>
             `;
-
-            document.getElementById('playBtn').addEventListener('click', () => {
-              const audio = new Audio(lastUrl);
-              audio.controls = true;
-              audio.style.width = '100%';
-              status.innerHTML = '';
-              status.appendChild(audio);
-              audio.play().catch(e => console.error('Автовоспроизведение заблокировано', e));
-            });
           };
 
           recorder.start();
@@ -120,13 +101,22 @@
           status.textContent = 'Запись...';
         } catch (err) {
           console.error(err);
-          status.textContent = '❌ Ошибка доступа к микрофону';
+          status.textContent = '❌ Ошибка доступа к микрофону. Проверь разрешения в Safari.';
         }
       });
 
       stopBtn.addEventListener('click', () => {
         if (recorder) recorder.stop();
       });
+
+      function playAudio(url) {
+        const audio = new Audio(url);
+        audio.controls = true;
+        audio.style.width = '100%';
+        status.innerHTML = '';
+        status.appendChild(audio);
+        audio.play().catch(e => console.log('Автоплей заблокирован браузером'));
+      }
     </script>
   </body>
 </html>
