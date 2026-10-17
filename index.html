@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Аудио-тест (Шаг 3 — исправлено)</title>
+    <title>Аудио-тест (Шаг 4 — финал)</title>
     <style>
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -45,28 +45,52 @@
         margin-top: 8px;
         display: none;
       }
+      .controls-area {
+        margin-top: 15px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+        max-width: 320px;
+      }
+      audio { width: 100%; border-radius: 10px; background: #fff; }
+      a.download-link {
+        display: block;
+        text-align: center;
+        padding: 14px;
+        background-color: #28a745;
+        color: white;
+        text-decoration: none;
+        border-radius: 10px;
+        font-weight: 600;
+      }
     </style>
   </head>
   <body>
-    <h1>Тест рекордера — Шаг 3 (фикс)</h1>
+    <h1>Тест рекордера — Шаг 4</h1>
     <button id="startBtn">Начать запись</button>
     <button id="stopBtn">Стоп</button>
     <div class="status" id="status"></div>
 
+    <div class="controls-area" id="controlsArea" style="display:none;">
+      <!-- Сюда вставим плеер и кнопку -->
+    </div>
+
     <script>
       let recorder = null;
       const chunks = [];
+      let lastUrl = null; // Чтобы освобождать память
       
       const startBtn = document.getElementById('startBtn');
       const stopBtn = document.getElementById('stopBtn');
       const status = document.getElementById('status');
+      const controlsArea = document.getElementById('controlsArea');
 
       startBtn.addEventListener('click', async () => {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-          // ВАЖНО: на iPhone НЕ указываем mimeType — иначе будет ошибка NotSupportedError.
-          // Safari сам выберет правильный формат (AAC).
+          
+          // На iPhone НЕ указываем mimeType — Safari сам выберет совместимый формат
           recorder = new MediaRecorder(stream);
 
           recorder.ondataavailable = (event) => {
@@ -75,7 +99,23 @@
           };
 
           recorder.onstop = () => {
-            status.textContent = 'Запись остановлена. Ждём Шаг 4...';
+            // ГЛАВНОЕ: собираем все кусочки в один Blob
+            const blob = new Blob(chunks, { type: 'audio/mp4' });
+            chunks.length = 0; // Очищаем массив, чтобы не копилось при новых записях
+
+            // Освобождаем старую ссылку, если была
+            if (lastUrl) URL.revokeObjectURL(lastUrl);
+
+            lastUrl = URL.createObjectURL(blob);
+
+            // Показываем плеер и кнопку
+            controlsArea.style.display = 'flex';
+            controlsArea.innerHTML = `
+              <audio controls src="${lastUrl}"></audio>
+              <a href="${lastUrl}" download="recording.mp4" class="download-link">⬇️ Скачать recording.mp4</a>
+            `;
+
+            status.textContent = '✅ Готово! Можно послушать и скачать.';
           };
 
           recorder.start();
@@ -99,7 +139,7 @@
 
       stopBtn.addEventListener('click', () => {
         if (recorder) {
-          recorder.stop();
+          recorder.stop(); // Это вызовет onstop и соберёт файл
           stopBtn.disabled = true;
         }
       });
