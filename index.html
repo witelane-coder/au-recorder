@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Аудио-тест (Шаг 2)</title>
+    <title>Аудио-тест (Шаг 3)</title>
     <style>
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -15,7 +15,17 @@
         align-items: center;
       }
       h1 { font-size: 1.3rem; margin-bottom: 10px; }
-      .status { margin-top: 12px; font-size: 0.9rem; color: #555; min-height: 1.2em; line-height: 1.4; }
+      .status { 
+        margin-top: 12px; 
+        font-size: 0.9rem; 
+        color: #555; 
+        min-height: 1.2em; 
+        line-height: 1.4; 
+        border: 1px dashed #ccc;
+        padding: 8px;
+        border-radius: 8px;
+        background: white;
+      }
       button {
         padding: 16px 24px;
         font-size: 1rem;
@@ -27,33 +37,65 @@
       }
       button:active { transform: scale(0.97); }
       #startBtn { background-color: #007aff; width: 100%; max-width: 300px; }
+      #stopBtn {
+        background-color: #ff3b30;
+        width: 100%;
+        max-width: 300px;
+        margin-top: 8px;
+        display: none; /* Скрыта, пока не начали запись */
+      }
     </style>
   </head>
   <body>
-    <h1>Тест рекордера — Шаг 2</h1>
+    <h1>Тест рекордера — Шаг 3</h1>
     <button id="startBtn">Начать запись</button>
+    <button id="stopBtn">Стоп</button>
     <div class="status" id="status"></div>
 
     <script>
+      let recorder = null;
+      const chunks = []; // Сюда будем складывать кусочки аудио
+      
       const startBtn = document.getElementById('startBtn');
+      const stopBtn = document.getElementById('stopBtn');
       const status = document.getElementById('status');
 
       startBtn.addEventListener('click', async () => {
         try {
-          // ГЛАВНОЕ: запрашиваем доступ к микрофону
-          await navigator.mediaDevices.getUserMedia({ audio: true });
+          // 1. Получаем доступ к микрофону (если уже разрешён — сразу идём дальше)
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+          // 2. Создаём рекордер. ВАЖНО: формат сразу MP4/AAC — это работает на iPhone
+          const options = { mimeType: 'audio/mp4; codecs=aac' };
+          recorder = new MediaRecorder(stream, options);
+
+          // 3. Каждый раз, когда накапливается кусочек аудио, сохраняем его
+          recorder.ondataavailable = (event) => {
+            chunks.push(event.data);
+            // Показываем, что идёт запись
+            status.textContent = `Пишу... (кусков: ${chunks.length})`;
+          };
+
+          // 4. Запускаем запись
+          recorder.start();
           
-          status.textContent = '✅ Микрофон разрешён! Переходим к шагу 3.';
-          console.log('Микрофон получен — можно двигаться дальше');
+          // Включаем кнопку СТОП, выключаем СТАРТ
+          startBtn.disabled = true;
+          stopBtn.style.display = 'block';
+          stopBtn.disabled = false;
+          status.textContent = '🎙️ Запись идёт... Говори!';
+
         } catch (err) {
-          if (err.name === 'NotAllowedError') {
-            status.innerHTML = '❌ Доступ запрещён. <b>Нажми «Разрешить» во всплывающем окне Safari.</b>';
-          } else if (err.name === 'SecurityError') {
-            status.innerHTML = '❌ Ошибка безопасности. <b>Нужен HTTPS (GitHub Pages).</b> По HTTP на iPhone доступ не дадут.';
-          } else {
-            status.textContent = `❌ Ошибка: ${err.message}`;
-          }
           console.error(err);
+          status.innerHTML = `<b>❌ Ошибка:</b> ${err.message}`;
+        }
+      });
+
+      stopBtn.addEventListener('click', () => {
+        if (recorder) {
+          recorder.stop(); // Это вызовет onstop (его добавим на шаге 4)
+          stopBtn.disabled = true;
+          status.textContent = 'Запись остановлена. Ждём Шаг 4...';
         }
       });
     </script>
