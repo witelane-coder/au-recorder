@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Аудио-тест (Шаг 3)</title>
+    <title>Аудио-тест (Шаг 3 — исправлено)</title>
     <style>
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -25,6 +25,7 @@
         padding: 8px;
         border-radius: 8px;
         background: white;
+        text-align: center;
       }
       button {
         padding: 16px 24px;
@@ -42,19 +43,19 @@
         width: 100%;
         max-width: 300px;
         margin-top: 8px;
-        display: none; /* Скрыта, пока не начали запись */
+        display: none;
       }
     </style>
   </head>
   <body>
-    <h1>Тест рекордера — Шаг 3</h1>
+    <h1>Тест рекордера — Шаг 3 (фикс)</h1>
     <button id="startBtn">Начать запись</button>
     <button id="stopBtn">Стоп</button>
     <div class="status" id="status"></div>
 
     <script>
       let recorder = null;
-      const chunks = []; // Сюда будем складывать кусочки аудио
+      const chunks = [];
       
       const startBtn = document.getElementById('startBtn');
       const stopBtn = document.getElementById('stopBtn');
@@ -62,24 +63,23 @@
 
       startBtn.addEventListener('click', async () => {
         try {
-          // 1. Получаем доступ к микрофону (если уже разрешён — сразу идём дальше)
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-          // 2. Создаём рекордер. ВАЖНО: формат сразу MP4/AAC — это работает на iPhone
-          const options = { mimeType: 'audio/mp4; codecs=aac' };
-          recorder = new MediaRecorder(stream, options);
+          // ВАЖНО: на iPhone НЕ указываем mimeType — иначе будет ошибка NotSupportedError.
+          // Safari сам выберет правильный формат (AAC).
+          recorder = new MediaRecorder(stream);
 
-          // 3. Каждый раз, когда накапливается кусочек аудио, сохраняем его
           recorder.ondataavailable = (event) => {
             chunks.push(event.data);
-            // Показываем, что идёт запись
             status.textContent = `Пишу... (кусков: ${chunks.length})`;
           };
 
-          // 4. Запускаем запись
+          recorder.onstop = () => {
+            status.textContent = 'Запись остановлена. Ждём Шаг 4...';
+          };
+
           recorder.start();
           
-          // Включаем кнопку СТОП, выключаем СТАРТ
           startBtn.disabled = true;
           stopBtn.style.display = 'block';
           stopBtn.disabled = false;
@@ -87,15 +87,20 @@
 
         } catch (err) {
           console.error(err);
-          status.innerHTML = `<b>❌ Ошибка:</b> ${err.message}`;
+          if (err.name === 'NotAllowedError') {
+            status.innerHTML = '❌ Доступ запрещён. Нажми “Разрешить” в окне Safari.';
+          } else if (err.name === 'SecurityError') {
+            status.innerHTML = '❌ Нужен HTTPS (GitHub Pages). По HTTP Safari не даст доступ к микрофону.';
+          } else {
+            status.textContent = `❌ Ошибка: ${err.message}`;
+          }
         }
       });
 
       stopBtn.addEventListener('click', () => {
         if (recorder) {
-          recorder.stop(); // Это вызовет onstop (его добавим на шаге 4)
+          recorder.stop();
           stopBtn.disabled = true;
-          status.textContent = 'Запись остановлена. Ждём Шаг 4...';
         }
       });
     </script>
