@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Аудио: запись + авто-конвертация в MP3</title>
+    <title>Аудио-тест на хостинге</title>
     <style>
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -14,139 +14,118 @@
         flex-direction: column;
         align-items: center;
       }
-      h1 { font-size: 1.5rem; margin-bottom: 20px; text-align: center; }
-
+      h1 { font-size: 1.3rem; margin-bottom: 10px; }
+      .status { margin-top: 12px; font-size: 0.9rem; color: #555; min-height: 1.2em; }
       button {
-        padding: 24px 32px;
-        font-size: 1.4rem;
+        padding: 16px 24px;
+        font-size: 1rem;
         border: none;
-        border-radius: 14px;
+        border-radius: 10px;
         color: white;
         cursor: pointer;
         transition: transform 0.1s;
-        width: 100%;
-        max-width: 400px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
       }
-      button:active { transform: scale(0.96); }
-
-      #initBtn { background-color: #888; display: block; }
-      #startBtn { background-color: #007aff; display: none; }
+      button:active { transform: scale(0.97); }
+      #initBtn { background-color: #888; width: 100%; max-width: 300px; }
+      #startBtn { background-color: #007aff; width: 100%; max-width: 300px; display: none; }
       #stopBtn {
         background-color: #ff3b30;
+        width: 100%;
+        max-width: 300px;
+        margin-top: 8px;
         display: none;
-        margin-top: 16px;
       }
-
-      .status {
-        margin-top: 24px;
-        font-size: 1.3rem;
-        color: #333;
-        min-height: 4.5em;
-        line-height: 1.4;
-        text-align: center;
-        border: 3px dashed #ccc;
-        padding: 20px;
-        border-radius: 14px;
-        width: 100%;
-        max-width: 420px;
-        background: white;
+      .action-buttons button {
+        margin-top: 10px;
+        padding: 12px 20px;
       }
-      .status.ok { color: #28a745; border-color: #28a745; background: #e8f5e9; }
-      .status.error { color: #d9534f; border-color: #d9534f; background: #f8d7da; }
-
-      .player-box {
-        margin-top: 24px;
-        width: 100%;
-        max-width: 420px;
-      }
-      audio {
-        width: 100%;
-        border-radius: 12px;
-        height: 60px;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      a.download-link {
+        display: inline-block;
+        margin-top: 10px;
+        padding: 12px 20px;
+        background-color: #28a745;
+        color: white;
+        text-decoration: none;
+        border-radius: 10px;
       }
     </style>
   </head>
   <body>
-    <h1>Запись + авто-конвертация в MP3</h1>
+    <h1>Тест рекордера</h1>
 
-    <button id="initBtn">1. Доступ к микрофону</button>
-    <button id="startBtn">2. Начать запись</button>
-    <button id="stopBtn" disabled>3. Стоп</button>
+    <!-- Кнопка-заглушка: нужна именно для iOS, чтобы появился запрос доступа -->
+    <button id="initBtn">Нажми сюда, чтобы разрешить микрофон</button>
 
-    <div class="status" id="status">Готов к тесту</div>
-    <div class="player-box" id="playerContainer" style="display:none;"></div>
-
-    <!-- Библиотека для конвертации WebM -> MP3 -->
-    <script src="https://unpkg.com/mic-recorder-to-mp3@2.0.2/dist/mic-recorder-to-mp3.min.js"></script>
+    <button id="startBtn">Начать запись</button>
+    <button id="stopBtn" disabled>Стоп</button>
+    <div class="status" id="status"></div>
 
     <script>
       let recorder = null;
       const chunks = [];
-      let lastUrl = null;
-
-      // Инициализация конвертера
-      const MicRecorder = window.MicRecorder;
-      const micRecorder = new MicRecorder({ bitRate: 128 });
+      let lastUrl = null; // для освобождения памяти
 
       const initBtn = document.getElementById('initBtn');
       const startBtn = document.getElementById('startBtn');
       const stopBtn = document.getElementById('stopBtn');
       const status = document.getElementById('status');
-      const playerContainer = document.getElementById('playerContainer');
 
+      // Шаг 1: сначала показываем кнопку-заглушку, чтобы «разблокировать» браузер
       initBtn.addEventListener('click', () => {
         initBtn.style.display = 'none';
         startBtn.style.display = 'block';
-        status.className = '';
         status.textContent = 'Теперь нажми “Начать запись”';
       });
 
+      // Шаг 2: запрашиваем микрофон только после «доверенного действия»
       startBtn.addEventListener('click', async () => {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          micRecorder.start(stream);
+          recorder = new MediaRecorder(stream);
 
-          status.className = 'ok';
-          status.textContent = 'Говори что-нибудь...';
+          recorder.ondataavailable = e => chunks.push(e.data);
+
+          recorder.onstop = () => {
+            // Освобождаем предыдущую ссылку, чтобы не забивать память
+            if (lastUrl) URL.revokeObjectURL(lastUrl);
+
+            const blob = new Blob(chunks, { type: 'audio/webm' });
+            chunks.length = 0; // очищаем массив
+
+            lastUrl = URL.createObjectURL(blob);
+
+            // Показываем кнопки: послушать и скачать
+            status.innerHTML = `
+              <b>✅ Готово!</b><br>
+              <div class="action-buttons">
+                <button id="playBtn" style="background-color: #007bff;">🔊 Послушать запись</button>
+                <a href="${lastUrl}" download="recording.webm" class="download-link">⬇️ Скачать .webm</a>
+              </div>
+            `;
+
+            document.getElementById('playBtn').addEventListener('click', () => {
+              const audio = new Audio(lastUrl);
+              audio.controls = true;
+              audio.style.width = '100%';
+              status.innerHTML = '';
+              status.appendChild(audio);
+              audio.play().catch(e => console.error('Автовоспроизведение заблокировано', e));
+            });
+          };
+
+          recorder.start();
           startBtn.disabled = true;
           stopBtn.style.display = 'block';
           stopBtn.disabled = false;
+          status.textContent = 'Запись...';
         } catch (err) {
           console.error(err);
-          status.className = 'error';
-          if (err.name === 'NotAllowedError') {
-            status.textContent = '❌ Доступ запрещён. Проверь настройки Safari.';
-          } else {
-            status.textContent = `❌ Ошибка: ${err.message}`;
-          }
+          status.textContent = '❌ Ошибка доступа к микрофону';
         }
       });
 
       stopBtn.addEventListener('click', () => {
-        stopBtn.disabled = true;
-        status.className = 'ok';
-        status.textContent = '⏳ Конвертация в MP3...';
-
-        micRecorder.stop().getMp3().then((blob) => {
-          if (lastUrl) URL.revokeObjectURL(lastUrl);
-          lastUrl = URL.createObjectURL(blob);
-
-          playerContainer.style.display = 'block';
-          playerContainer.innerHTML = `<audio controls src="${lastUrl}"></audio>`;
-
-          status.className = 'ok';
-          status.innerHTML = `
-            <b>✅ Готово!</b><br>
-            Размер файла: ${blob.size} байт.<br>
-            Нажми Play — звук пойдёт сразу.
-          `;
-        }).catch((e) => {
-          console.error(e);
-          status.className = 'error';
-          status.textContent = '❌ Ошибка конвертации. Попробуй ещё раз.';
-        });
+        if (recorder) recorder.stop();
       });
     </script>
   </body>
