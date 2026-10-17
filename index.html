@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Запись аудио (MP4 ready)</title>
+  <title>Запись аудио — простая версия</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
@@ -32,7 +32,7 @@
     #stopBtn {
       background-color: #ff3b30;
       margin-top: 16px;
-      display: none; /* Скрыта по умолчанию */
+      display: none;
     }
     .status {
       margin-top: 24px;
@@ -50,7 +50,6 @@
     .status.ok { color: #28a745; border-color: #28a745; background: #e8f5e9; }
     .status.error { color: #d9534f; border-color: #d9534f; background: #f8d7da; }
     
-    /* Стили для плеера - он скрыт, пока нет файла */
     .player-box {
       margin-top: 24px;
       width: 100%;
@@ -78,7 +77,6 @@
 
   <div class="status" id="status">Готов к записи</div>
   
-  <!-- Плеер скрыт по умолчанию, появится только после записи -->
   <div class="player-box" id="playerContainer">
     <audio controls></audio>
   </div>
@@ -94,8 +92,7 @@
     const playerContainer = document.getElementById('playerContainer');
     const audioElement = playerContainer.querySelector('audio');
 
-    // Формат, который Safari на iPhone пишет нативно. 
-    // Это УЖЕ MP4 с кодеком AAC. Конвертация не нужна!
+    // Формат, который Safari на iPhone пишет сразу как готовый MP4
     const mimeType = 'audio/mp4; codecs=aac';
 
     startBtn.addEventListener('click', async () => {
@@ -105,7 +102,6 @@
 
         recorder.ondataavailable = (e) => {
           chunks.push(e.data);
-          // Показываем прогресс в статусе
           const totalSize = chunks.reduce((sum, chunk) => sum + chunk.size, 0);
           status.className = 'ok';
           status.textContent = `Пишу… (${Math.round(totalSize / 1024)} КБ)`;
@@ -122,22 +118,17 @@
             return;
           }
 
-          // Создаем Blob (это и есть наш MP4 файл)
           const blob = new Blob(chunks, { type: mimeType });
-          chunks.length = 0; // Очищаем массив
+          chunks.length = 0;
 
-          // Освобождаем старую ссылку, если была
           if (audioUrl) URL.revokeObjectURL(audioUrl);
-          
-          // Создаем новую ссылку на файл
           audioUrl = URL.createObjectURL(blob);
 
-          // Включаем плеер и показываем его
           audioElement.src = audioUrl;
           playerContainer.classList.add('visible');
 
           status.className = 'ok';
-          status.innerHTML = '<b>✅ Готово!</b><br>Файл создан (MP4/AAC). Теперь можно слушать или отправлять.';
+          status.innerHTML = '<b>✅ Готово!</b><br>Файл создан. Можно слушать.';
         };
 
         recorder.start();
@@ -152,7 +143,7 @@
         console.error(err);
         status.className = 'error';
         if (err.name === 'NotAllowedError') {
-          status.textContent = '❌ Доступ запрещён. Нажми "Разрешить" в окне Safari.';
+          status.textContent = '❌ Доступ запрещён. Нажми “Разрешить” в окне Safari.';
         } else if (err.name === 'SecurityError') {
           status.textContent = '❌ Ошибка безопасности. Нужен HTTPS (GitHub Pages).';
         } else {
