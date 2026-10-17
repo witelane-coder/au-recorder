@@ -1,160 +1,153 @@
 <!DOCTYPE html>
 <html lang="ru">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Запись аудио — простая версия</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-      background: #f4f4f5;
-      margin: 0;
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    h1 { font-size: 1.5rem; margin-bottom: 24px; text-align: center; }
-    button {
-      padding: 22px 30px;
-      font-size: 1.3rem;
-      border: none;
-      border-radius: 12px;
-      color: white;
-      cursor: pointer;
-      transition: transform 0.1s;
-      width: 100%;
-      max-width: 400px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    button:active { transform: scale(0.96); }
-    #startBtn { background-color: #007aff; }
-    #stopBtn {
-      background-color: #ff3b30;
-      margin-top: 16px;
-      display: none;
-    }
-    .status {
-      margin-top: 24px;
-      font-size: 1.2rem;
-      min-height: 3em;
-      line-height: 1.4;
-      text-align: center;
-      border: 2px dashed #aaa;
-      padding: 16px;
-      border-radius: 12px;
-      width: 100%;
-      max-width: 420px;
-      background: white;
-    }
-    .status.ok { color: #28a745; border-color: #28a745; background: #e8f5e9; }
-    .status.error { color: #d9534f; border-color: #d9534f; background: #f8d7da; }
-    
-    .player-box {
-      margin-top: 24px;
-      width: 100%;
-      max-width: 420px;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.3s ease;
-    }
-    .player-box.visible {
-      opacity: 1;
-      pointer-events: auto;
-    }
-    audio {
-      width: 100%;
-      border-radius: 12px;
-      height: 60px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-    }
-  </style>
-</head>
-<body>
-  <h1>Запись аудио</h1>
-  <button id="startBtn">Начать запись</button>
-  <button id="stopBtn">Стоп</button>
-
-  <div class="status" id="status">Готов к записи</div>
-  
-  <div class="player-box" id="playerContainer">
-    <audio controls></audio>
-  </div>
-
-  <script>
-    let recorder = null;
-    const chunks = [];
-    let audioUrl = null;
-
-    const startBtn = document.getElementById('startBtn');
-    const stopBtn = document.getElementById('stopBtn');
-    const status = document.getElementById('status');
-    const playerContainer = document.getElementById('playerContainer');
-    const audioElement = playerContainer.querySelector('audio');
-
-    // Формат, который Safari на iPhone пишет сразу как готовый MP4
-    const mimeType = 'audio/mp4; codecs=aac';
-
-    startBtn.addEventListener('click', async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        recorder = new MediaRecorder(stream, { mimeType: mimeType });
-
-        recorder.ondataavailable = (e) => {
-          chunks.push(e.data);
-          const totalSize = chunks.reduce((sum, chunk) => sum + chunk.size, 0);
-          status.className = 'ok';
-          status.textContent = `Пишу… (${Math.round(totalSize / 1024)} КБ)`;
-        };
-
-        recorder.onstop = () => {
-          stopBtn.disabled = true;
-          startBtn.disabled = false;
-          startBtn.textContent = 'Начать запись';
-
-          if (chunks.length === 0) {
-            status.className = 'error';
-            status.textContent = '❌ Запись пуста.';
-            return;
-          }
-
-          const blob = new Blob(chunks, { type: mimeType });
-          chunks.length = 0;
-
-          if (audioUrl) URL.revokeObjectURL(audioUrl);
-          audioUrl = URL.createObjectURL(blob);
-
-          audioElement.src = audioUrl;
-          playerContainer.classList.add('visible');
-
-          status.className = 'ok';
-          status.innerHTML = '<b>✅ Готово!</b><br>Файл создан. Можно слушать.';
-        };
-
-        recorder.start();
-        startBtn.disabled = true;
-        startBtn.textContent = 'Запись идёт...';
-        stopBtn.style.display = 'block';
-        stopBtn.disabled = false;
-        status.className = 'ok';
-        status.textContent = 'Говори...';
-
-      } catch (err) {
-        console.error(err);
-        status.className = 'error';
-        if (err.name === 'NotAllowedError') {
-          status.textContent = '❌ Доступ запрещён. Нажми “Разрешить” в окне Safari.';
-        } else if (err.name === 'SecurityError') {
-          status.textContent = '❌ Ошибка безопасности. Нужен HTTPS (GitHub Pages).';
-        } else {
-          status.textContent = `❌ Ошибка: ${err.message}`;
-        }
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Аудио: запись + авто-конвертация в MP3</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background: #f4f4f5;
+        margin: 0;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
       }
-    });
+      h1 { font-size: 1.5rem; margin-bottom: 20px; text-align: center; }
 
-    stopBtn.addEventListener('click', () => {
-      if (recorder) recorder.stop();
-    });
-  </script>
-</body>
+      button {
+        padding: 24px 32px;
+        font-size: 1.4rem;
+        border: none;
+        border-radius: 14px;
+        color: white;
+        cursor: pointer;
+        transition: transform 0.1s;
+        width: 100%;
+        max-width: 400px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      }
+      button:active { transform: scale(0.96); }
+
+      #initBtn { background-color: #888; display: block; }
+      #startBtn { background-color: #007aff; display: none; }
+      #stopBtn {
+        background-color: #ff3b30;
+        display: none;
+        margin-top: 16px;
+      }
+
+      .status {
+        margin-top: 24px;
+        font-size: 1.3rem;
+        color: #333;
+        min-height: 4.5em;
+        line-height: 1.4;
+        text-align: center;
+        border: 3px dashed #ccc;
+        padding: 20px;
+        border-radius: 14px;
+        width: 100%;
+        max-width: 420px;
+        background: white;
+      }
+      .status.ok { color: #28a745; border-color: #28a745; background: #e8f5e9; }
+      .status.error { color: #d9534f; border-color: #d9534f; background: #f8d7da; }
+
+      .player-box {
+        margin-top: 24px;
+        width: 100%;
+        max-width: 420px;
+      }
+      audio {
+        width: 100%;
+        border-radius: 12px;
+        height: 60px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Запись + авто-конвертация в MP3</h1>
+
+    <button id="initBtn">1. Доступ к микрофону</button>
+    <button id="startBtn">2. Начать запись</button>
+    <button id="stopBtn" disabled>3. Стоп</button>
+
+    <div class="status" id="status">Готов к тесту</div>
+    <div class="player-box" id="playerContainer" style="display:none;"></div>
+
+    <!-- Библиотека для конвертации WebM -> MP3 -->
+    <script src="https://unpkg.com/mic-recorder-to-mp3@2.0.2/dist/mic-recorder-to-mp3.min.js"></script>
+
+    <script>
+      let recorder = null;
+      const chunks = [];
+      let lastUrl = null;
+
+      // Инициализация конвертера
+      const MicRecorder = window.MicRecorder;
+      const micRecorder = new MicRecorder({ bitRate: 128 });
+
+      const initBtn = document.getElementById('initBtn');
+      const startBtn = document.getElementById('startBtn');
+      const stopBtn = document.getElementById('stopBtn');
+      const status = document.getElementById('status');
+      const playerContainer = document.getElementById('playerContainer');
+
+      initBtn.addEventListener('click', () => {
+        initBtn.style.display = 'none';
+        startBtn.style.display = 'block';
+        status.className = '';
+        status.textContent = 'Теперь нажми “Начать запись”';
+      });
+
+      startBtn.addEventListener('click', async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          micRecorder.start(stream);
+
+          status.className = 'ok';
+          status.textContent = 'Говори что-нибудь...';
+          startBtn.disabled = true;
+          stopBtn.style.display = 'block';
+          stopBtn.disabled = false;
+        } catch (err) {
+          console.error(err);
+          status.className = 'error';
+          if (err.name === 'NotAllowedError') {
+            status.textContent = '❌ Доступ запрещён. Проверь настройки Safari.';
+          } else {
+            status.textContent = `❌ Ошибка: ${err.message}`;
+          }
+        }
+      });
+
+      stopBtn.addEventListener('click', () => {
+        stopBtn.disabled = true;
+        status.className = 'ok';
+        status.textContent = '⏳ Конвертация в MP3...';
+
+        micRecorder.stop().getMp3().then((blob) => {
+          if (lastUrl) URL.revokeObjectURL(lastUrl);
+          lastUrl = URL.createObjectURL(blob);
+
+          playerContainer.style.display = 'block';
+          playerContainer.innerHTML = `<audio controls src="${lastUrl}"></audio>`;
+
+          status.className = 'ok';
+          status.innerHTML = `
+            <b>✅ Готово!</b><br>
+            Размер файла: ${blob.size} байт.<br>
+            Нажми Play — звук пойдёт сразу.
+          `;
+        }).catch((e) => {
+          console.error(e);
+          status.className = 'error';
+          status.textContent = '❌ Ошибка конвертации. Попробуй ещё раз.';
+        });
+      });
+    </script>
+  </body>
 </html>
