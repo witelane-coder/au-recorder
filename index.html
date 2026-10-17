@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Аудио: Safari iOS (без проверок MIME)</title>
+  <title>Запись аудио (MP4 ready)</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
@@ -32,7 +32,7 @@
     #stopBtn {
       background-color: #ff3b30;
       margin-top: 16px;
-      display: none;
+      display: none; /* Скрыта по умолчанию */
     }
     .status {
       margin-top: 24px;
@@ -49,10 +49,19 @@
     }
     .status.ok { color: #28a745; border-color: #28a745; background: #e8f5e9; }
     .status.error { color: #d9534f; border-color: #d9534f; background: #f8d7da; }
+    
+    /* Стили для плеера - он скрыт, пока нет файла */
     .player-box {
       margin-top: 24px;
       width: 100%;
       max-width: 420px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .player-box.visible {
+      opacity: 1;
+      pointer-events: auto;
     }
     audio {
       width: 100%;
@@ -63,12 +72,16 @@
   </style>
 </head>
 <body>
-  <h1>Запись аудио (для Safari iOS)</h1>
+  <h1>Запись аудио</h1>
   <button id="startBtn">Начать запись</button>
   <button id="stopBtn">Стоп</button>
 
   <div class="status" id="status">Готов к записи</div>
-  <div class="player-box" id="playerContainer" style="display:none;"></div>
+  
+  <!-- Плеер скрыт по умолчанию, появится только после записи -->
+  <div class="player-box" id="playerContainer">
+    <audio controls></audio>
+  </div>
 
   <script>
     let recorder = null;
@@ -79,22 +92,23 @@
     const stopBtn = document.getElementById('stopBtn');
     const status = document.getElementById('status');
     const playerContainer = document.getElementById('playerContainer');
+    const audioElement = playerContainer.querySelector('audio');
 
-    // Самый надёжный формат для iOS Safari
+    // Формат, который Safari на iPhone пишет нативно. 
+    // Это УЖЕ MP4 с кодеком AAC. Конвертация не нужна!
     const mimeType = 'audio/mp4; codecs=aac';
 
     startBtn.addEventListener('click', async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-        // Пробуем создать рекордер сразу, без проверок isTypeSupported
         recorder = new MediaRecorder(stream, { mimeType: mimeType });
 
         recorder.ondataavailable = (e) => {
           chunks.push(e.data);
+          // Показываем прогресс в статусе
           const totalSize = chunks.reduce((sum, chunk) => sum + chunk.size, 0);
           status.className = 'ok';
-          status.textContent = `Пишу… (${totalSize} байт)`;
+          status.textContent = `Пишу… (${Math.round(totalSize / 1024)} КБ)`;
         };
 
         recorder.onstop = () => {
@@ -108,22 +122,22 @@
             return;
           }
 
+          // Создаем Blob (это и есть наш MP4 файл)
           const blob = new Blob(chunks, { type: mimeType });
-          chunks.length = 0; // очищаем
+          chunks.length = 0; // Очищаем массив
 
+          // Освобождаем старую ссылку, если была
           if (audioUrl) URL.revokeObjectURL(audioUrl);
+          
+          // Создаем новую ссылку на файл
           audioUrl = URL.createObjectURL(blob);
 
-          playerContainer.style.display = 'block';
-          playerContainer.innerHTML = `<audio controls src="${audioUrl}"></audio>`;
+          // Включаем плеер и показываем его
+          audioElement.src = audioUrl;
+          playerContainer.classList.add('visible');
 
           status.className = 'ok';
-          status.innerHTML = `
-            <b>✅ Готово!</b><br>
-            Формат: ${mimeType}<br>
-            Размер: ${blob.size} байт.<br>
-            Нажми Play — звук пойдёт сразу.
-          `;
+          status.innerHTML = '<b>✅ Готово!</b><br>Файл создан (MP4/AAC). Теперь можно слушать или отправлять.';
         };
 
         recorder.start();
@@ -138,9 +152,9 @@
         console.error(err);
         status.className = 'error';
         if (err.name === 'NotAllowedError') {
-          status.textContent = '❌ Доступ запрещён. Проверь настройки Safari или нажми “Разрешить” в системном окне.';
+          status.textContent = '❌ Доступ запрещён. Нажми "Разрешить" в окне Safari.';
         } else if (err.name === 'SecurityError') {
-          status.textContent = '❌ Ошибка безопасности. Страница должна быть по HTTPS (не http://IP).';
+          status.textContent = '❌ Ошибка безопасности. Нужен HTTPS (GitHub Pages).';
         } else {
           status.textContent = `❌ Ошибка: ${err.message}`;
         }
